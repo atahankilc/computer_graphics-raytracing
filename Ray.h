@@ -3,10 +3,14 @@
 
 #include "Vector.h"
 
-class Ray {
-public:
-    Vector origin, direction;
+#define MAX_T 100
 
+struct Ray {
+    Vector origin, direction;
+    Vector p, n;
+    float t = MAX_T;
+
+    Ray();
     Ray(Vector const &origin, Vector const &direction);
 };
 

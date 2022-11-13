@@ -2,21 +2,34 @@
 #define INC_477_HW1_SCENE_H
 
 #include <utility>
+#include <sstream>
 
 #include "Vector.h"
 #include "Camera.h"
 #include "Object.h"
+#include "./default_files/tinyxml2.h"
+#include "./default_files/ppm.h"
 
 class Scene {
 public:
-    parser::Scene scene;
-    Camera *currentCamera;
-    Ray *currentRay;
-    std::vector<Sphere> spheres;
+    Vector background_color;
+    float shadow_ray_epsilon;
+    int max_recursion_depth;
+    std::vector<Camera*> cameras;
+    Vector ambient_light;
+    std::vector<PointLight> point_lights;
+    std::vector<Material> materials;
+    std::vector<Vector> vertex_data;
+    std::vector<Object*> objects;
 
-    Scene(parser::Scene &parsedScene);
+    Camera* cCamera;
+    unsigned char* cImage;
 
-    Vector ComputeColor();
+    explicit Scene(const std::string &filepath);
+    ~Scene();
+
+    void renderCameras();
+    Vector computeColor(Ray &ray, int recursionDepth);
 };
 
 #endif //INC_477_HW1_SCENE_H

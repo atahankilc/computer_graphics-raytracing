@@ -1,25 +1,11 @@
 #include "Camera.h"
 
-Camera::Camera(parser::Camera &parserCamera) {
-    this->image_name = parserCamera.image_name;
+Camera::Camera() = default;
 
-    this->e = Vector(parserCamera.position);
-    this->v = Vector(parserCamera.up);
-    this->w = Vector(parserCamera.gaze)*(-1);
-    this->u = Vector(v&w);
-
-    this->distance = parserCamera.near_distance;
-    this->width = parserCamera.image_width;
-    this->height = parserCamera.image_height;
-
-    this->pixelWidth = (parserCamera.near_plane.y-parserCamera.near_plane.x) / (float) this->width;
-    this->pixelWidthOffset = this->pixelWidth / 2;
-    this->pixelHeight = (parserCamera.near_plane.w-parserCamera.near_plane.z) / (float) this->height;
-    this->pixelHeightOffset = this->pixelHeight / 2;
-
-    this->m = this->e + this->w*(-this->distance);
-    this->q = this->m + this->u*parserCamera.near_plane.x + this->v*parserCamera.near_plane.w;
+Camera::~Camera() {
+    //std::cout << "Camera deleted\n";
 }
+
 
 Ray Camera::generateRay(int i, int j) const {
     float su = (float) i * this->pixelWidth + this->pixelWidthOffset;
