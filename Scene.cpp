@@ -1,3 +1,4 @@
+#include <thread>
 #include "Scene.h"
 
 Scene::Scene(const std::string &filepath) {
@@ -239,44 +240,52 @@ Scene::~Scene() {
     }
 }
 
-void Scene::renderCameras() {
-    int cameraCount = this->cameras.size();
-    for(int k = 0; k < cameraCount; k++){
-        this->cCamera = this->cameras[k];
+void Scene::renderScene() {
+    for(auto camera : this->cameras) {
+        auto start = std::chrono::system_clock::now();
+
+        cCamera = camera;
         this->cImage = new unsigned char [cCamera->width * cCamera->height * 3];
-        int index = 0;
-        for (int j = 0; j < cCamera->height; ++j)
-        {
-            for (int i = 0; i < cCamera->width; ++i)
-            {
-                Ray generatedRay = this->cCamera->generateRay(i, j);
-
-                Vector color = this->computeColor(generatedRay, 0);
-
-                this->cImage[index++] = (unsigned char)color.x;
-                this->cImage[index++] = (unsigned char)color.y;
-                this->cImage[index++] = (unsigned char)color.z;
-            }
-        }
+        std::thread t1(&Scene::renderCamera, this, 0 , cCamera->width);
+        t1.join();
         write_ppm(this->cCamera->image_name.c_str(), this->cImage, this->cCamera->width, this->cCamera->height);
         delete[] this->cImage;
+
+        auto end = std::chrono::system_clock::now();
+        std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::milliseconds> (end - start).count() << "[ms]" << std::endl;
     }
 }
 
-Vector Scene::computeColor(Ray &ray, int recursionDepth) {
+void Scene::renderCamera(int start, int end) {
+    int index = start;
+    for (int j = 0; j < cCamera->height; ++j)
+    {
+        for (int i = start; i < end; ++i)
+        {
+            Ray generatedRay = this->cCamera->generateRay(i, j);
+
+            Vector color = this->computeColor(generatedRay, 0, nullptr);
+
+            this->cImage[j*cCamera->width*3 + i*3] = (unsigned char)color.x;
+            this->cImage[j*cCamera->width*3 + i*3+1] = (unsigned char)color.y;
+            this->cImage[j*cCamera->width*3 + i*3+2] = (unsigned char)color.z;
+        }
+    }
+}
+
+Vector Scene::computeColor(Ray &ray, int recursionDepth, Object* recursionObject) {
     Vector color;
     float minT = MAX_T;
     Object *intersectedObject = nullptr;
-    int objectCount = this->objects.size();
-    for(int i = 0; i < objectCount; i++) {
-        this->objects[i]->intersect(&ray);
-        if(ray.t<minT && ray.t>0.001){
-            minT = ray.t;
-            intersectedObject =  this->objects[i];
+    for(auto object : this->objects){
+        if(recursionObject != object) {
+            object->intersect(&ray, recursionObject);
+            if (ray.t < minT && ray.t > this->shadow_ray_epsilon) {
+                minT = ray.t;
+                intersectedObject = object;
+            }
         }
     }
-    if(recursionDepth > 0 && minT == MAX_T)
-        return color;
     ray.t = minT;
     ray.p = ray.origin + ray.direction*ray.t;
 
@@ -293,11 +302,14 @@ Vector Scene::computeColor(Ray &ray, int recursionDepth) {
             bool inShadow = false;
 
             Ray shadowRay;
-            shadowRay.origin = ray.p + ray.n * this->shadow_ray_epsilon;
+            shadowRay.origin = ray.p + ray.n*this->shadow_ray_epsilon;
             shadowRay.direction = lightVector;
+            //float intersectionToLight = len(pointLight.position - (ray.p + lightVector * this->shadow_ray_epsilon));
             for (auto object: this->objects) {
-                object->intersect(&shadowRay);
+                object->intersect(&shadowRay, nullptr);
+                //float newIntersectionToLight = len(shadowRay.origin + shadowRay.direction*shadowRay.t - (ray.p + lightVector * this->shadow_ray_epsilon));
                 if (shadowRay.t < 1 && shadowRay.t > 0) {
+                    //if(newIntersectionToLight-intersectionToLight <= 0 )
                     inShadow = true;
                     break;
                 }
@@ -310,21 +322,22 @@ Vector Scene::computeColor(Ray &ray, int recursionDepth) {
 
                 Vector kd = intersectedObject->material.diffuse;
                 kd *= E * (nLightVector * ray.n);
-                diffuse = nLightVector * ray.n >= 0 ? diffuse + kd : diffuse;
+                diffuse = nLightVector * ray.n > 0 ? diffuse + kd : diffuse;
 
                 Vector ks = intersectedObject->material.specular;
                 ks *= E * pow((h * ray.n), intersectedObject->material.phong_exponent);
-                specular = h * ray.n >= 0 ? specular + ks : specular;
+                specular = h * ray.n > 0 ? specular + ks : specular;
             }
         }
 
+        // mesh kendiile yansıma yapmıyo hepsi aynı obje olduğu için
         if(intersectedObject->material.is_mirror && recursionDepth < this->max_recursion_depth) {
             Ray wr;
             Vector wo = !(ray.origin-ray.p);
             wr.origin = ray.p;
             wr.direction = !(ray.n*(ray.n*wo)*2 - wo);
             Vector km = intersectedObject->material.mirror;
-            km *= computeColor(wr, recursionDepth+1);
+            km *= computeColor(wr, recursionDepth+1, intersectedObject->getIntersectedObject());
             mirror = mirror + km;
         }
 
@@ -339,7 +352,7 @@ Vector Scene::computeColor(Ray &ray, int recursionDepth) {
         if(color.z > 255){
             color.z = 255;
         }
-    } else {
+    } else if (recursionDepth == 0){
         color = this->background_color;
     }
     return color;

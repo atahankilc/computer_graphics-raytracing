@@ -1,27 +1,19 @@
 #include "Object.h"
 
-#define MAX_T 1000
-
 Object::~Object() = default;
-
-Vector Object::getColor(Vector &ambientLight, PointLight &pointLight, Ray &ray) {
-    // TODO
-    Vector l = !(pointLight.position+ray.p*(-1));
-    Vector ambient = this->material.ambient;
-    ambient *= ambientLight;
-    Vector diffuse = this->material.diffuse;
-    diffuse *= pointLight.intensity/pow(len(l),2)*(l*ray.n);
-
-    return ambient + diffuse;
-}
 
 Sphere::Sphere(Material &material, Vector &centerVertex, float radius) {
     this->material = material;
     this->centerVertex = centerVertex;
     this->radius = radius;
+    this->intersectedObject = this;
 }
 
-void Sphere::intersect(Ray* ray) {
+void Sphere::intersect(Ray* ray, Object* recursionObject) {
+    if(recursionObject == this) {
+        ray->t = MAX_T;
+        return;
+    }
     float t, t1, t2;
     float A,B,C;
     float delta;
@@ -38,8 +30,8 @@ void Sphere::intersect(Ray* ray) {
         t = -B / (2*A);
     } else {
         delta = sqrt(delta);
-        t1 = (-B + delta) / (2*A);
-        t2 = (-B - delta) / (2*A);
+        t1 = (-B + delta) /  (2.f*A);
+        t2 = (-B - delta) / (2.f*A);
         t = t1 < t2 ? t1 : t2;
     }
 
@@ -48,6 +40,10 @@ void Sphere::intersect(Ray* ray) {
 
 void Sphere::normal(Ray &ray) {
     ray.n = !(ray.p-this->centerVertex);
+}
+
+Object *Sphere::getIntersectedObject() {
+    return this->intersectedObject;
 }
 
 Sphere::~Sphere() {
@@ -60,9 +56,15 @@ Triangle::Triangle(Material &material, Vector &v0, Vector &v1, Vector &v2) {
     this->v1 = v1;
     this->v2 = v2;
     this->n = !((this->v2-this->v1)&(this->v0-this->v1));
+    this->intersectedObject = this;
 }
 
-void Triangle::intersect(Ray* ray) {
+void Triangle::intersect(Ray* ray, Object* recursionObject) {
+    if(recursionObject == this) {
+        ray->t = MAX_T;
+        return;
+    }
+
     float A, alpha, beta, t;
 
     A = det(this->v0.x-this->v1.x,this->v0.y-this->v1.y,this->v0.z-this->v1.z,
@@ -89,22 +91,28 @@ void Triangle::normal(Ray &ray) {
     ray.n = this->n;
 }
 
+Object *Triangle::getIntersectedObject() {
+    return this->intersectedObject;
+}
+
 Triangle::~Triangle() {
     //std::cout << "triangle destructed\n";
 }
 
 Mesh::Mesh(Material &material) {
     this->material = material;
+    this->intersectedObject = this;
 }
 
-void Mesh::intersect(Ray* ray) {
+void Mesh::intersect(Ray* ray, Object* recursionObject) {
     float minT = MAX_T;
 
     for(auto triangle : this->triangles){
-        triangle->intersect(ray);
+        triangle->intersect(ray, recursionObject);
         if(ray->t != -1 && ray->t < minT) {
             minT = ray->t;
             this->n = triangle->n;
+            this->intersectedObject = triangle->getIntersectedObject();
         }
     }
     ray->t = minT;
@@ -114,8 +122,14 @@ void Mesh::normal(Ray &ray) {
     ray.n = this->n;
 }
 
+Object *Mesh::getIntersectedObject() {
+    return this->intersectedObject;
+}
+
 Mesh::~Mesh() {
     for(auto triangle : this->triangles)
         delete triangle;
     //std::cout << "mesh destructed\n";
 }
+
+

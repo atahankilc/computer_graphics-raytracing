@@ -28,8 +28,9 @@ public:
     explicit Scene(const std::string &filepath);
     ~Scene();
 
-    void renderCameras();
-    Vector computeColor(Ray &ray, int recursionDepth);
+    void renderScene();
+    void renderCamera(int, int);
+    Vector computeColor(Ray&, int, Object*);
 };
 
 #endif //INC_477_HW1_SCENE_H

@@ -3,8 +3,6 @@
 
 #include "Vector.h"
 
-#define MAX_T 100
-
 struct Ray {
     Vector origin, direction;
     Vector p, n;

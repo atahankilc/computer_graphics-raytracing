@@ -11,5 +11,5 @@ Ray Camera::generateRay(int i, int j) const {
     float su = (float) i * this->pixelWidth + this->pixelWidthOffset;
     float sv = (float)j * this->pixelHeight + this->pixelHeightOffset;
     Vector s = this->q + this->u * su - this->v * sv;
-    return Ray(this->e, s- this->e);
+    return Ray(this->e, s - this->e);
 }

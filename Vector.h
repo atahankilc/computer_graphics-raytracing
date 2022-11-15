@@ -2,8 +2,9 @@
 #define INC_477_HW1_VECTOR_H
 
 #include <cmath>
+#include <limits>
 
-#include "additional_files/vector.h"
+#define MAX_T std::numeric_limits<float>::max()
 
 typedef struct Vector {
     float x, y, z;
