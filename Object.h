@@ -28,14 +28,12 @@ struct PointLight
 class Object {
 public:
     Material material;
-    Object* intersectedObject;
     Vector n;
 
     virtual ~Object();
 
-    virtual void intersect(Ray* ray, Object*) = 0;
-    virtual void normal(Ray &ray) = 0;
-    virtual Object* getIntersectedObject() = 0;
+    virtual void intersect(Ray&) = 0;
+    virtual void normal(Ray&) = 0;
 };
 
 class Sphere : public Object {
@@ -46,9 +44,8 @@ public:
     Sphere(Material&, Vector&, float);
     ~Sphere() override;
 
-    void intersect(Ray*, Object*) override;
+    void intersect(Ray&) override;
     void normal(Ray&) override;
-    Object* getIntersectedObject() override;
 };
 
 class Triangle : public Object {
@@ -58,9 +55,8 @@ public:
     Triangle(Material&, Vector&, Vector&, Vector&);
     ~Triangle() override;
 
-    void intersect(Ray*, Object*) override;
+    void intersect(Ray&) override;
     void normal(Ray&) override;
-    Object* getIntersectedObject() override;
 };
 
 class Mesh : public  Object {
@@ -70,9 +66,8 @@ public:
     Mesh(Material&);
     ~Mesh() override;
 
-    void intersect(Ray*, Object*) override;
+    void intersect(Ray&) override;
     void normal(Ray&) override;
-    Object* getIntersectedObject() override;
 };
 
 #endif //INC_477_HW1_OBJECT_H

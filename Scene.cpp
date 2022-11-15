@@ -246,8 +246,11 @@ void Scene::renderScene() {
 
         cCamera = camera;
         this->cImage = new unsigned char [cCamera->width * cCamera->height * 3];
-        std::thread t1(&Scene::renderCamera, this, 0 , cCamera->width);
-        t1.join();
+        for(int j = 0; j < cCamera->height; j++) {
+            for(int i = 0; i < cCamera->width; i++){
+                this->renderPixel(i,j);
+            }
+        }
         write_ppm(this->cCamera->image_name.c_str(), this->cImage, this->cCamera->width, this->cCamera->height);
         delete[] this->cImage;
 
@@ -256,34 +259,24 @@ void Scene::renderScene() {
     }
 }
 
-void Scene::renderCamera(int start, int end) {
-    int index = start;
-    for (int j = 0; j < cCamera->height; ++j)
-    {
-        for (int i = start; i < end; ++i)
-        {
-            Ray generatedRay = this->cCamera->generateRay(i, j);
-
-            Vector color = this->computeColor(generatedRay, 0, nullptr);
-
-            this->cImage[j*cCamera->width*3 + i*3] = (unsigned char)color.x;
-            this->cImage[j*cCamera->width*3 + i*3+1] = (unsigned char)color.y;
-            this->cImage[j*cCamera->width*3 + i*3+2] = (unsigned char)color.z;
-        }
-    }
+void Scene::renderPixel(int i, int j) {
+    Ray generatedRay = this->cCamera->generateRay(i, j);
+    Vector color = this->computeColor(generatedRay, 0, this->max_recursion_depth);
+    int imageLocation = (j*cCamera->height + i) * 3;
+    this->cImage[imageLocation]   = (unsigned char)color.x;
+    this->cImage[imageLocation+1] = (unsigned char)color.y;
+    this->cImage[imageLocation+2] = (unsigned char)color.z;
 }
 
-Vector Scene::computeColor(Ray &ray, int recursionDepth, Object* recursionObject) {
+Vector Scene::computeColor(Ray &ray, float ray_epsilon, int recursionDepth) {
     Vector color;
     float minT = MAX_T;
     Object *intersectedObject = nullptr;
     for(auto object : this->objects){
-        if(recursionObject != object) {
-            object->intersect(&ray, recursionObject);
-            if (ray.t < minT && ray.t > this->shadow_ray_epsilon) {
-                minT = ray.t;
-                intersectedObject = object;
-            }
+        object->intersect(ray);
+        if (ray.t < minT && ray.t > ray_epsilon) {
+            minT = ray.t;
+            intersectedObject = object;
         }
     }
     ray.t = minT;
@@ -304,12 +297,9 @@ Vector Scene::computeColor(Ray &ray, int recursionDepth, Object* recursionObject
             Ray shadowRay;
             shadowRay.origin = ray.p + ray.n*this->shadow_ray_epsilon;
             shadowRay.direction = lightVector;
-            //float intersectionToLight = len(pointLight.position - (ray.p + lightVector * this->shadow_ray_epsilon));
             for (auto object: this->objects) {
-                object->intersect(&shadowRay, nullptr);
-                //float newIntersectionToLight = len(shadowRay.origin + shadowRay.direction*shadowRay.t - (ray.p + lightVector * this->shadow_ray_epsilon));
+                object->intersect(shadowRay);
                 if (shadowRay.t < 1 && shadowRay.t > 0) {
-                    //if(newIntersectionToLight-intersectionToLight <= 0 )
                     inShadow = true;
                     break;
                 }
@@ -330,14 +320,13 @@ Vector Scene::computeColor(Ray &ray, int recursionDepth, Object* recursionObject
             }
         }
 
-        // mesh kendiile yansıma yapmıyo hepsi aynı obje olduğu için
-        if(intersectedObject->material.is_mirror && recursionDepth < this->max_recursion_depth) {
+        if(intersectedObject->material.is_mirror && recursionDepth > 0) {
             Ray wr;
             Vector wo = !(ray.origin-ray.p);
-            wr.origin = ray.p;
+            wr.origin = ray.p + ray.n*this->shadow_ray_epsilon;
             wr.direction = !(ray.n*(ray.n*wo)*2 - wo);
             Vector km = intersectedObject->material.mirror;
-            km *= computeColor(wr, recursionDepth+1, intersectedObject->getIntersectedObject());
+            km *= computeColor(wr, 0,recursionDepth-1);
             mirror = mirror + km;
         }
 

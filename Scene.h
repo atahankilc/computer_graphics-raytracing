@@ -29,8 +29,8 @@ public:
     ~Scene();
 
     void renderScene();
-    void renderCamera(int, int);
-    Vector computeColor(Ray&, int, Object*);
+    void renderPixel(int, int);
+    Vector computeColor(Ray&, float, int);
 };
 
 #endif //INC_477_HW1_SCENE_H
