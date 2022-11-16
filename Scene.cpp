@@ -170,7 +170,7 @@ Scene::Scene(const std::string &filepath) {
         stream >> material_id;
         child = element->FirstChildElement("Faces");
         stream << child->GetText() << std::endl;
-        auto mesh = new Mesh(this->materials[material_id-1]);
+        //auto mesh = new Mesh(this->materials[material_id-1]);
         while (!(stream >> v0_id).eof())
         {
             stream >> v1_id >> v2_id;
@@ -178,10 +178,10 @@ Scene::Scene(const std::string &filepath) {
                                           this->vertex_data[v0_id-1],
                                           this->vertex_data[v1_id-1],
                                           this->vertex_data[v2_id-1]);
-            mesh->triangles.push_back(triangle);
+            objects.push_back(triangle);
         }
         stream.clear();
-        objects.push_back(mesh);
+        //objects.push_back(mesh);
         element = element->NextSiblingElement("Mesh");
     }
     stream.clear();
@@ -246,11 +246,17 @@ void Scene::renderScene() {
 
         cCamera = camera;
         this->cImage = new unsigned char [cCamera->width * cCamera->height * 3];
-        for(int j = 0; j < cCamera->height; j++) {
-            for(int i = 0; i < cCamera->width; i++){
-                this->renderPixel(i,j);
-            }
-        }
+        this->index = cCamera->width * cCamera->height;
+
+        std::thread t1(&Scene::renderCamera, this, 0, cCamera->width/4);
+        std::thread t2(&Scene::renderCamera, this, cCamera->width/4, cCamera->width/2);
+        std::thread t3(&Scene::renderCamera, this, cCamera->width/2, 3*cCamera->width/4);
+        std::thread t4(&Scene::renderCamera, this, 3*cCamera->width/4, cCamera->width);
+        t1.join();
+        t2.join();
+        t3.join();
+        t4.join();
+
         write_ppm(this->cCamera->image_name.c_str(), this->cImage, this->cCamera->width, this->cCamera->height);
         delete[] this->cImage;
 
@@ -259,10 +265,33 @@ void Scene::renderScene() {
     }
 }
 
+int Scene::getIndex() {
+    this->mutex.lock();
+    return --this->index;
+}
+
+void Scene::renderCamera(int start, int end) {
+    int i,j;
+    while((index = getIndex()) >= 0) {
+        this->mutex.unlock();
+        j = index/this->cCamera->width;
+        i = index%this->cCamera->width;
+        this->renderPixel(i,j);
+    }
+    this->mutex.unlock();
+    /*
+    for(int j = 0; j < cCamera->height; j++) {
+        for(int i = start; i < end; i++){
+            this->renderPixel(i,j);
+        }
+    }
+    */
+}
+
 void Scene::renderPixel(int i, int j) {
     Ray generatedRay = this->cCamera->generateRay(i, j);
     Vector color = this->computeColor(generatedRay, 0, this->max_recursion_depth);
-    int imageLocation = (j*cCamera->height + i) * 3;
+    int imageLocation = (j*cCamera->width + i) * 3;
     this->cImage[imageLocation]   = (unsigned char)color.x;
     this->cImage[imageLocation+1] = (unsigned char)color.y;
     this->cImage[imageLocation+2] = (unsigned char)color.z;
@@ -299,7 +328,7 @@ Vector Scene::computeColor(Ray &ray, float ray_epsilon, int recursionDepth) {
             shadowRay.direction = lightVector;
             for (auto object: this->objects) {
                 object->intersect(shadowRay);
-                if (shadowRay.t < 1 && shadowRay.t > 0) {
+                if (shadowRay.t < 1 && shadowRay.t >= 0) {
                     inShadow = true;
                     break;
                 }
@@ -341,7 +370,7 @@ Vector Scene::computeColor(Ray &ray, float ray_epsilon, int recursionDepth) {
         if(color.z > 255){
             color.z = 255;
         }
-    } else if (recursionDepth == 0){
+    } else if (recursionDepth == this->max_recursion_depth){
         color = this->background_color;
     }
     return color;

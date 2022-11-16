@@ -25,12 +25,17 @@ public:
     Camera* cCamera;
     unsigned char* cImage;
 
+    std::mutex mutex;
+    int index;
+
     explicit Scene(const std::string &filepath);
     ~Scene();
 
     void renderScene();
+    void renderCamera(int, int);
     void renderPixel(int, int);
     Vector computeColor(Ray&, float, int);
+    int getIndex();
 };
 
 #endif //INC_477_HW1_SCENE_H
