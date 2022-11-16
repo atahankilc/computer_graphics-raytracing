@@ -11,34 +11,11 @@ typedef struct Vector {
 
     Vector() {x = 0, y = 0, z = 0;}
 
-    /*
-    Vector(Vec3f const &str) {
-        this->x = str.x;
-        this->y = str.y;
-        this->z = str.z;
-    }
-
-    Vector(Vec3i const &str) {
-        this->x = float(str.x);
-        this->y = float(str.y);
-        this->z = float(str.z);
-    }
-     */
-
     Vector(Vector const &str) {
         this->x = str.x;
         this->y = str.y;
         this->z = str.z;
     }
-
-    /*
-    Vector& operator= (Vec3f const &str) {
-        this->x = str.x;
-        this->y = str.y;
-        this->z = str.z;
-        return *this;
-    }
-     */
 
     Vector& operator= (Vector const &str) {
         this->x = str.x;
@@ -53,12 +30,6 @@ typedef struct Vector {
         v.y = this->y + str.y;
         v.z = this->z + str.z;
         return v;
-    }
-
-    void operator+= (Vector const &str) const {
-        this->x + str.x;
-        this->y + str.y;
-        this->z + str.z;
     }
 
     Vector operator- (Vector const &str) const {

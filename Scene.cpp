@@ -1,4 +1,3 @@
-#include <thread>
 #include "Scene.h"
 
 Scene::Scene(const std::string &filepath) {
@@ -241,21 +240,26 @@ Scene::~Scene() {
 }
 
 void Scene::renderScene() {
+    const unsigned int threadCount = std::thread::hardware_concurrency();
+
     for(auto camera : this->cameras) {
         auto start = std::chrono::system_clock::now();
 
         cCamera = camera;
         this->cImage = new unsigned char [cCamera->width * cCamera->height * 3];
-        this->index = cCamera->width * cCamera->height;
+        this->index = cCamera->height;
 
-        std::thread t1(&Scene::renderCamera, this, 0, cCamera->width/4);
-        std::thread t2(&Scene::renderCamera, this, cCamera->width/4, cCamera->width/2);
-        std::thread t3(&Scene::renderCamera, this, cCamera->width/2, 3*cCamera->width/4);
-        std::thread t4(&Scene::renderCamera, this, 3*cCamera->width/4, cCamera->width);
-        t1.join();
-        t2.join();
-        t3.join();
-        t4.join();
+        if (threadCount > 0) {
+            std::thread *threads = new std::thread[threadCount];
+            for (int i = 0; i < threadCount; i++) {
+                threads[i] = std::thread(&Scene::renderCamera, this);
+            }
+            for (int i = 0; i < threadCount; i++)
+                threads[i].join();
+            delete[] threads;
+        } else {
+            this->renderCamera();
+        }
 
         write_ppm(this->cCamera->image_name.c_str(), this->cImage, this->cCamera->width, this->cCamera->height);
         delete[] this->cImage;
@@ -265,45 +269,31 @@ void Scene::renderScene() {
     }
 }
 
-int Scene::getIndex() {
-    this->mutex.lock();
-    return --this->index;
-}
-
-void Scene::renderCamera(int start, int end) {
-    int i,j;
-    while((index = getIndex()) >= 0) {
-        this->mutex.unlock();
-        j = index/this->cCamera->width;
-        i = index%this->cCamera->width;
-        this->renderPixel(i,j);
-    }
-    this->mutex.unlock();
-    /*
-    for(int j = 0; j < cCamera->height; j++) {
-        for(int i = start; i < end; i++){
+void Scene::renderCamera() {
+    int j;
+    while(getRow(j) >= 0) {
+        for(int i = 0; i < this->cCamera->width; i++) {
             this->renderPixel(i,j);
         }
     }
-    */
 }
 
 void Scene::renderPixel(int i, int j) {
     Ray generatedRay = this->cCamera->generateRay(i, j);
-    Vector color = this->computeColor(generatedRay, 0, this->max_recursion_depth);
+    Vector color = this->computeColor(generatedRay, this->max_recursion_depth);
     int imageLocation = (j*cCamera->width + i) * 3;
     this->cImage[imageLocation]   = (unsigned char)color.x;
     this->cImage[imageLocation+1] = (unsigned char)color.y;
     this->cImage[imageLocation+2] = (unsigned char)color.z;
 }
 
-Vector Scene::computeColor(Ray &ray, float ray_epsilon, int recursionDepth) {
+Vector Scene::computeColor(Ray &ray, int recursionDepth) {
     Vector color;
     float minT = MAX_T;
     Object *intersectedObject = nullptr;
     for(auto object : this->objects){
         object->intersect(ray);
-        if (ray.t < minT && ray.t > ray_epsilon) {
+        if (ray.t < minT && ray.t > 0) {
             minT = ray.t;
             intersectedObject = object;
         }
@@ -328,7 +318,7 @@ Vector Scene::computeColor(Ray &ray, float ray_epsilon, int recursionDepth) {
             shadowRay.direction = lightVector;
             for (auto object: this->objects) {
                 object->intersect(shadowRay);
-                if (shadowRay.t < 1 && shadowRay.t >= 0) {
+                if (shadowRay.t < 1 && shadowRay.t > 0) {
                     inShadow = true;
                     break;
                 }
@@ -355,7 +345,7 @@ Vector Scene::computeColor(Ray &ray, float ray_epsilon, int recursionDepth) {
             wr.origin = ray.p + ray.n*this->shadow_ray_epsilon;
             wr.direction = !(ray.n*(ray.n*wo)*2 - wo);
             Vector km = intersectedObject->material.mirror;
-            km *= computeColor(wr, 0,recursionDepth-1);
+            km *= computeColor(wr,recursionDepth-1);
             mirror = mirror + km;
         }
 
@@ -374,5 +364,12 @@ Vector Scene::computeColor(Ray &ray, float ray_epsilon, int recursionDepth) {
         color = this->background_color;
     }
     return color;
+}
+
+int Scene::getRow(int &j) {
+    this->mutex.lock();
+    j = --this->index;
+    this->mutex.unlock();
+    return j;
 }
 

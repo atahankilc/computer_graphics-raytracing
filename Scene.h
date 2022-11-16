@@ -3,6 +3,8 @@
 
 #include <utility>
 #include <sstream>
+#include <thread>
+#include <mutex>
 
 #include "Vector.h"
 #include "Camera.h"
@@ -32,10 +34,10 @@ public:
     ~Scene();
 
     void renderScene();
-    void renderCamera(int, int);
+    void renderCamera();
     void renderPixel(int, int);
-    Vector computeColor(Ray&, float, int);
-    int getIndex();
+    Vector computeColor(Ray&, int);
+    int getRow(int&);
 };
 
 #endif //INC_477_HW1_SCENE_H
